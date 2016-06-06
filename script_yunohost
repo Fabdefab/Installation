@@ -1,0 +1,92 @@
+#!/bin/bash
+#script a exécuté en tant que root
+#script doit être utilisé sous Debian 8
+clear
+#---------------------------------------------------------------------------------------------------------------$
+# Test que le script est lance en root
+if [ $EUID -ne 0 ]; then
+  echo "Le script doit être lancé en root" 1>&2
+  exit 1
+fi
+#---------------------------------------------------------------------------------------------------------------$
+echo -e "\033[34m=======================================================\033[0m"
+echo "############################ Script install "
+echo "Entrée le nom de domaine"
+read ndd
+echo "################################################################"
+#---------------------------------------------------------------------------------------------------------------$
+echo "Entrée l'utilisateur"
+read user
+echo -e "entrez le mot de passe de l’utilisateur :\nlaissez vide pour l’autogénérer."
+read -s tpass
+#---------------------------------------------------------------------------------------------------------------$
+echo -e "\033[34m=======================================================\033[0m"
+if [ -e "$user" ]; then
+     echo "Le login existe déjà!"
+else
+     echo "Le login n'existe pas, du moins n'est pas dans le répertoire d'exécution du script"
+fi
+clear
+#---------------------------------------------------------------------------------------------------------------$
+#mise à jours
+echo -e "\033[34m=======================================================\033[0m"
+echo "############################ mise à jours"
+apt-get update -y
+apt-get upgrade -y
+echo "############################ mise à jours affectué"
+#---------------------------------------------------------------------------------------------------------------$
+#install de sudo nano pwgen openssl
+echo -e "\033[34m=======================================================\033[0m"
+echo "############################ installation de sudo nano pwgen openssl"
+apt-get install sudo nano pwgen openssl -y
+echo "############################ installation effectué"
+#---------------------------------------------------------------------------------------------------------------$
+#génération du mot de pass de l’utilisateur
+if [[ ${#tpass} = 0 ]];then
+pass=$(pwgen -B -N 1 -y 12)
+else pass=$tpass
+fi
+echo "################################################################"
+#---------------------------------------------------------------------------------------------------------------$
+echo "Entrée le port ssh"
+read pssh
+echo "################################################################"
+#---------------------------------------------------------------------------------------------------------------$
+#ajout de l'utilisateur avec droit sudo
+echo -e "\033[34m=======================================================\033[0m"
+echo "############################ ajout de l'utilisateur "$user"  avec droit sudo"
+useradd $user -g sudo -p $(echo $pass | openssl passwd -1 -stdin) --create-home -s /bin/bash
+echo "############################ utilisateur "$user" ajouté"
+#---------------------------------------------------------------------------------------------------------------$
+############################# Changement du hostname
+cp /etc/hosts /etc/hosts.old
+/bin/sed -i '$d' /etc/hosts
+echo $ip"     "$ndd""$nddc>> /etc/hosts
+/bin/sed -i '$d' /etc/hostname
+echo $ndd"     "$nddc>> /etc/hostname
+/etc/init.d/networking restart
+echo "############################ hostname modifié"
+#---------------------------------------------------------------------------------------------------------------$
+#Changement du port ssh
+echo -e "\033[34m=======================================================\033[0m"
+echo "############################ Changement du port ssh"
+/bin/sed -i -e 's/^Port 22/Port '$pssh' /' /etc/ssh/sshd_config
+/bin/sed -i -e 's/^PermitRootLogin yes/PermitRootLogin no /' /etc/ssh/sshd_config
+/etc/init.d/ssh reload
+echo "############################ Port ssh modifié"
+#---------------------------------------------------------------------------------------------------------------$
+echo "############################ la configuration du serveur est terminé"
+echo "Nom de l'utilisateur : "$user
+echo "Le mot de passe de l'utilisateur : "$pass
+echo "Le port de connexion SSH : "$pssh
+echo "################################################################"
+#---------------------------------------------------------------------------------------------------------------$
+echo "installation de Yunohost"
+echo "############################ Istallation de GIT"
+apt-get install git -y
+echo "############################ Clonage du dépot du script d’installation de YunoHost"
+git clone https://github.com/YunoHost/install_script /tmp/install_script
+echo "############################ Lancement du script d’installation"
+cd /tmp/install_script && sudo ./install_yunohost
+echo "############################ installation de yunohost terminé"
+#---------------------------------------------------------------------------------------------------------------$
